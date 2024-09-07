@@ -1,0 +1,146 @@
+use std::{fs, io, io::prelude::*, process};
+
+fn main() {
+    let mut buffer = String::new();
+    let stdin = io::stdin();
+    print("--------------------------------------------");
+    print!("{esc}[2J{esc}[1;1H", esc = 27 as char); //clear terminal
+    print("Welcome, type h for help");
+    loop {
+        buffer = String::new();
+        let res = stdin.read_line(&mut buffer);
+        if let Err(e) = res {
+            println!("Error while reading stdin: {:?}", e);
+        }
+        buffer = buffer.replace("\n", "");
+        match buffer.as_str() {
+            "h" | "help" => command_help(),
+            "rdl" | "list" => command_read_default_list(),
+            "cdl" | "clear" => command_clear_default_list(),
+            "exit" => command_exit(),
+            "atdl" = > command_add_to_default_list(),
+            _ => print(&("u typed sum else: ".to_string() + buffer.as_str())),
+        }
+    }
+}
+fn get_root_dir() -> String {
+    return dirs::config_dir()
+        .unwrap()
+        .into_os_string()
+        .into_string()
+        .unwrap()
+        + "/rust_todo_app";
+}
+fn command_help() {
+    print("Commands    |  Function");
+
+    print("h / help    |  display this menu");
+    print("exit        |  kill this process, exits the loop");
+    print("rdl / list  |  read default list (".to_owned() + get_root_dir().as_str() + "/list)");
+    print("cdl / clear |  clear default list (".to_owned() + get_root_dir().as_str() + "/list)");
+    print("atdl        |  add to defauly list (".to_owned() + get_root_dir().as_str() + "/list)");
+}
+fn command_exit() {
+    process::exit(0x0100);
+}
+fn command_read_default_list() {
+    print(read_file(&(get_root_dir() + "/list")));
+}
+fn command_clear_default_list() {
+    clear_file(&(get_root_dir() + "/list"));
+}
+
+fn command_add_to_default_list() {
+    print("Content: ");
+    let content = read_stdin();
+    print("priority: (enter 0 for none)");
+    let priority = read_stdin();
+    print(&("content: ".to_owned() + content.as_str()));
+    print(&("priority: ".to_owned() + priority.as_str()));
+}
+
+fn print<S: AsRef<str>>(arg: S) {
+    println!("{}", arg.as_ref());
+}
+
+fn read_stdin() -> String {
+    let mut buffer = String::new();
+    let stdin = io::stdin();
+    let res = stdin.read_line(&mut buffer);
+    println!("{:?}", res);
+    return buffer;
+}
+
+fn read_file(dir: &String) -> String {
+    let mut file;
+    match fs::File::open(dir) {
+        Ok(f) => file = f,
+        Err(e) => {
+            println!("Err, error: {:?}", e);
+            return String::new();
+        }
+    }
+    let mut contents = String::new();
+    let res = file.read_to_string(&mut contents);
+    if let Err(e) = res {
+        println!("Error while reading file: {:?}", e);
+    }
+    //println!("read_file(): file.read_to_string().res: {:?}", res);
+    trim_newline(&mut contents);
+    return contents;
+}
+fn trim_newline(s: &mut String) {
+    if s.ends_with('\n') {
+        s.pop();
+        if s.ends_with('\r') {
+            s.pop();
+        }
+    }
+}
+
+fn get_tasks(dir: &String) -> Vec<String> {
+    let file_contents = read_file(dir);
+    println!("{}", file_contents);
+    let collection_temp = file_contents.split('\n').collect::<Vec<&str>>();
+    let mut collection: Vec<String> = vec![];
+    for item in collection_temp {
+        if item == "" {
+            continue;
+        }
+        collection.push(item.to_string());
+    }
+    return collection;
+}
+
+fn write_to_file_from_vec(dir: &String, vec: Vec<String>) {
+    for item in vec {
+        add_task(dir, item);
+    }
+}
+
+fn clear_file(dir: &String) {
+    let res = fs::write(dir, &"");
+    if let Err(e) = res {
+        println!("Error while clearing file: {:?}", e);
+    }
+}
+
+fn add_task(dir: &String, content: String) {
+    let mut file_contents = read_file(dir);
+    if get_tasks(dir).len() == 0 {
+        file_contents = "-".to_owned() + content.as_str() + "\n";
+    } else {
+        file_contents += &("-".to_owned() + content.as_str() + "\n");
+    }
+    print("{file_contents}");
+    let res = fs::write(dir, file_contents);
+    if let Err(e) = res {
+        println!("Error while adding a task: {:?}", e);
+    }
+}
+
+fn add_task_with_priority(dir: &String, content: String, priority: usize) {
+    let mut fc_vec = get_tasks(dir);
+    fc_vec.insert(priority, content);
+    write_to_file_from_vec(dir, fc_vec);
+}
